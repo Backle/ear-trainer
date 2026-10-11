@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interval Ear Trainer</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --text: #1d2330;
+    --muted: #667085;
+    --line: #d5d9e0;
+    --accent: #2f5aa8;
+    --accent-text: #ffffff;
+    --btn: #eef1f6;
+    --btn-hover: #e1e7f1;
+    --ok: #1f8a4c;
+    --ok-bg: #e5f5ec;
+    --bad: #c23a32;
+    --bad-bg: #fbe9e7;
+    --active: #fff4cc;
+    --staff: #1d2330;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171c;
+      --card: #1e232b;
+      --text: #e7eaf0;
+      --muted: #9aa3b2;
+      --line: #353c48;
+      --accent: #6f9be8;
+      --accent-text: #0e1420;
+      --btn: #2a313c;
+      --btn-hover: #343c49;
+      --ok: #5cc98a;
+      --ok-bg: #173226;
+      --bad: #f07a71;
+      --bad-bg: #3a1d1b;
+      --active: #4a4020;
+      --staff: #e7eaf0;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 16px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+  h1 { font-size: 1.35rem; margin: 0; }
+  .toolbar { display: flex; gap: 6px; }
+  .score { width: 100%; color: var(--muted); font-size: 0.95rem; }
+  .score b { color: var(--text); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  button {
+    font: inherit; color: var(--text); background: var(--btn);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: var(--btn-hover); }
+  button:disabled { opacity: 0.35; cursor: default; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button.small { padding: 4px 10px; font-size: 0.9rem; }
+  .hidden { display: none !important; }
+
+  #staff { width: 100%; height: auto; display: block; }
+
+  .slots { display: flex; gap: 8px; margin: 8px 0 12px; }
+  .slot {
+    flex: 1; text-align: left; padding: 8px 10px; border-radius: 8px;
+    border: 2px solid var(--line); background: transparent; font-size: 0.95rem;
+  }
+  .slot .lbl { display: block; color: var(--muted); font-size: 0.8rem; }
+  .slot .val { font-weight: 700; font-size: 1.1rem; }
+  .slot:disabled { opacity: 1; }
+  .slot.active { border-color: var(--accent); background: var(--active); }
+  .slot.ok { border-color: var(--ok); background: var(--ok-bg); }
+  .slot.bad { border-color: var(--bad); background: var(--bad-bg); }
+
+  .grid { display: grid; grid-template-columns: 3.6em repeat(7, 1fr); gap: 5px; align-items: center; }
+  .grid .rowlbl { color: var(--muted); font-size: 0.75rem; text-align: right; padding-right: 4px; }
+  .grid .colhdr { color: var(--muted); font-size: 0.75rem; text-align: center; }
+  .grid button { padding: 10px 0; min-height: 44px; font-weight: 600; }
+  .grid .tritone { grid-column: 2 / span 7; }
+
+  .controls { display: flex; gap: 8px; margin-top: 14px; }
+  .controls button { flex: 1; padding: 12px; font-size: 1.05rem; }
+  .hint { color: var(--muted); font-size: 0.8rem; text-align: center; margin-top: 8px; }
+  kbd { border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-size: 0.8em; }
+
+  #status { text-align: center; color: var(--muted); min-height: 1.4em; margin: 4px 0; }
+  #feedback { margin-top: 12px; }
+  #feedback .line { padding: 6px 10px; border-radius: 8px; margin-bottom: 6px; }
+  #feedback .line.ok { background: var(--ok-bg); color: var(--ok); }
+  #feedback .line.bad { background: var(--bad-bg); color: var(--bad); }
+  #feedback .notes { font-family: ui-monospace, Menlo, Consolas, monospace; margin-top: 6px; font-size: 1rem; }
+
+  h2 { font-size: 1.1rem; margin: 0 0 10px; }
+  h3 { font-size: 0.95rem; margin: 16px 0 6px; color: var(--muted); }
+  .checks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .checks label { display: flex; align-items: center; gap: 6px; padding: 4px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; }
+  select, input[type=range] { font: inherit; }
+  select { padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  input[type=range] { flex: 1; min-width: 140px; }
+  .warn { color: var(--bad); font-size: 0.9rem; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .bar { height: 10px; background: var(--btn); border-radius: 5px; overflow: hidden; min-width: 60px; }
+  .bar > span { display: block; height: 100%; background: var(--accent); }
+  #chart { width: 100%; height: auto; display: block; }
+  .tablewrap { max-height: 260px; overflow-y: auto; }
+  footer { color: var(--muted); font-size: 0.75rem; text-align: center; padding: 8px 0 24px; }
+
+  @media (max-width: 420px) {
+    main { padding: 16px 12px; }
+    .grid { grid-template-columns: 2.6em repeat(7, 1fr); gap: 4px; }
+    .grid button { font-size: 0.9rem; }
+    .checks { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Interval Ear Trainer</h1>
+    <div class="toolbar">
+      <button id="btnProgress" class="small" aria-expanded="false">📈 Progress</button>
+      <button id="btnSettings" class="small" aria-expanded="false">⚙ Settings</button>
+    </div>
+    <div class="score" id="score"></div>
+    <div class="warn hidden" id="storageWarn">This browser is not letting the page save your history, so scores will only last until you close the page.</div>
+  </header>
+
+  <!-- Settings -->
+  <section id="settings" class="card hidden" aria-label="Settings">
+    <h2>Settings</h2>
+    <h3>Intervals to include</h3>
+    <div class="checks" id="intervalChecks"></div>
+    <div class="row">
+      <button class="small" id="checkAll">All</button>
+      <button class="small" id="checkNone">None</button>
+    </div>
+    <h3>Note range</h3>
+    <div class="row">
+      <label>Lowest <select id="lowNote"></select></label>
+      <label>Highest <select id="highNote"></select></label>
+    </div>
+    <h3>Tempo</h3>
+    <div class="row">
+      <input type="range" id="bpm" min="30" max="160" step="5">
+      <span id="bpmLabel"></span>
+    </div>
+    <div id="settingsWarn" class="warn"></div>
+  </section>
+
+  <!-- Progress / history -->
+  <section id="progress" class="card hidden" aria-label="Progress">
+    <h2>Progress</h2>
+    <div id="progressBody"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="small" id="btnExport">Download history</button>
+      <button class="small" id="btnImport">Load history</button>
+      <button class="small" id="btnClear">Clear history</button>
+      <input type="file" id="importFile" accept="application/json,.json" class="hidden">
+    </div>
+  </section>
+
+  <!-- Exercise -->
+  <section class="card" aria-label="Exercise">
+    <svg id="staff" viewBox="0 0 360 170" role="img" aria-label="Music staff"></svg>
+    <div id="status">Press Start to load the piano.</div>
+
+    <div class="slots">
+      <button class="slot" id="slot0" type="button"><span class="lbl">Interval 1 (note 1 → 2)</span><span class="val">—</span></button>
+      <button class="slot" id="slot1" type="button"><span class="lbl">Interval 2 (note 2 → 3)</span><span class="val">—</span></button>
+    </div>
+
+    <div class="grid" id="answerGrid"></div>
+
+    <div id="feedback"></div>
+
+    <div class="controls">
+      <button id="btnReplay" disabled>🔊 Replay</button>
+      <button id="btnNext" class="primary">▶ Start</button>
+    </div>
+    <div class="hint"><kbd>R</kbd> / <kbd>Space</kbd> replay · <kbd>N</kbd> / <kbd>Enter</kbd> next</div>
+  </section>
+
+  <footer>
+    Piano: Salamander Grand Piano by Alexander Holm (CC-BY 3.0), played with Tone.js.
+  </footer>
+</main>
+
+<!-- ===== Core logic (pure, no browser needed — also loaded by test.js) ===== -->
+<script id="core">
+var Core = (function () {
+  // Interval table. `num` is the interval number (2nd, 3rd …) used for spelling;
+  // the tritone can be spelled as an augmented 4th or a diminished 5th.
+  var INTERVALS = [
+    { id: 'm2', label: 'm2', name: 'minor 2nd',   semis: 1,  nums: [2] },
+    { id: 'M2', label: 'M2', name: 'major 2nd',   semis: 2,  nums: [2] },
+    { id: 'm3', label: 'm3', name: 'minor 3rd',   semis: 3,  nums: [3] },
+    { id: 'M3', label: 'M3', name: 'major 3rd',   semis: 4,  nums: [3] },
+    { id: 'P4', label: 'P4', name: 'perfect 4th', semis: 5,  nums: [4] },
+    { id: 'TT', label: 'Tritone', name: 'tritone', semis: 6, nums: [4, 5] },
+    { id: 'P5', label: 'P5', name: 'perfect 5th', semis: 7,  nums: [5] },
+    { id: 'm6', label: 'm6', name: 'minor 6th',   semis: 8,  nums: [6] },
+    { id: 'M6', label: 'M6', name: 'major 6th',   semis: 9,  nums: [6] },
+    { id: 'm7', label: 'm7', name: 'minor 7th',   semis: 10, nums: [7] },
+    { id: 'M7', label: 'M7', name: 'major 7th',   semis: 11, nums: [7] },
+    { id: 'P8', label: 'P8', name: 'octave',      semis: 12, nums: [8] }
+  ];
+  var BY_ID = {};
+  INTERVALS.forEach(function (iv) { BY_ID[iv.id] = iv; });
+
+  var LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+  var LETTER_PC = [0, 2, 4, 5, 7, 9, 11];
+  var SHARP_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+
+  function mod(a, n) { return ((a % n) + n) % n; }
+
+  // A spelled note: { letter: 0..6 (C..B), acc: -2..2, octave } ; MIDI 60 = C4.
+  function midiOf(n) { return 12 * (n.octave + 1) + LETTER_PC[n.letter] + n.acc; }
+
+  // Accidental symbol: ♯ ♭, or 𝄪 𝄫 for the rare double sharp / double flat.
+  function accSymbol(acc) { return { '-2': '𝄫', '-1': '♭', '0': '', '1': '♯', '2': '𝄪' }[acc]; }
+
+  function noteName(n) { return LETTERS[n.letter] + accSymbol(n.acc) + n.octave; }
+
+  // Plain sharp-based name for a MIDI number (used in the range drop-downs).
+  function midiName(m) { return SHARP_NAMES[mod(m, 12)] + (Math.floor(m / 12) - 1); }
+
+  // Spell the note `semis` semitones above `n`, `num` letter-steps up (num=3 → a 3rd).
+  function spellUp(n, num, semis) {
+    var steps = n.letter + (num - 1);
+    var res = { letter: mod(steps, 7), octave: n.octave + Math.floor(steps / 7), acc: 0 };
+    res.acc = (midiOf(n) + semis) - midiOf({ letter: res.letter, octave: res.octave, acc: 0 });
+    return res;
+  }
+
+  // All single-accidental spellings of a MIDI number (e.g. 61 → C♯4, D♭4).
+  function spellingsOf(m) {
+    var out = [];
+    for (var oct = Math.floor(m / 12) - 2; oct <= Math.floor(m / 12); oct++) {
+      for (var l = 0; l < 7; l++) {
+        var acc = m - midiOf({ letter: l, octave: oct, acc: 0 });
+        if (acc >= -1 && acc <= 1) out.push({ letter: l, octave: oct, acc: acc });
+      }
+    }
+    return out;
+  }
+
+  // Cost of a spelling: accidentals cost 1, odd ones (E♯ B♯ C♭ F♭) cost extra, doubles cost a lot.
+  function noteCost(n) {
+    var a = Math.abs(n.acc);
+    if (a >= 2) return 100;
+    if (a === 1 && ((n.acc > 0 && (n.letter === 2 || n.letter === 6)) || (n.acc < 0 && (n.letter === 0 || n.letter === 3)))) return 3;
+    return a;
+  }
+
+  // Spell a 3-note chain so letter names agree with the interval names, choosing the
+  // start spelling and tritone spelling (aug 4th / dim 5th) that reads most simply.
+  function spellChain(startMidi, ivIds, rng) {
+    rng = rng || Math.random;
+    var best = null, bestCost = Infinity, ties = 0;
+    spellingsOf(startMidi).forEach(function (start) {
+      var a = BY_ID[ivIds[0]], b = BY_ID[ivIds[1]];
+      a.nums.forEach(function (na) {
+        b.nums.forEach(function (nb) {
+          var n2 = spellUp(start, na, a.semis);
+          var n3 = spellUp(n2, nb, b.semis);
+          // a plainly named first note reads best, so odd start spellings (E♯, C♭ …) cost a bit more
+          var cost = noteCost(start) + (noteCost(start) === 3 ? 1 : 0) + noteCost(n2) + noteCost(n3);
+          if (cost < bestCost) { best = { notes: [start, n2, n3], nums: [na, nb] }; bestCost = cost; ties = 1; }
+          else if (cost === bestCost && rng() < 1 / ++ties) { best = { notes: [start, n2, n3], nums: [na, nb] }; }
+        });
+      });
+    });
+    return best;
+  }
+
+  // Pairs of enabled intervals whose total span fits inside [low, high].
+  function fittingPairs(enabled, low, high) {
+    var pairs = [];
+    enabled.forEach(function (a) {
+      enabled.forEach(function (b) {
+        if (BY_ID[a].semis + BY_ID[b].semis <= high - low) pairs.push([a, b]);
+      });
+    });
+    return pairs;
+  }
+
+  // Make one question: settings = { enabled: [ids], low: midi, high: midi }.
+  // Returns null if no pair of enabled intervals fits the range.
+  function generateQuestion(settings, rng) {
+    rng = rng || Math.random;
+    var pairs = fittingPairs(settings.enabled, settings.low, settings.high);
+    if (!pairs.length) return null;
+    var pair = pairs[Math.floor(rng() * pairs.length)];
+    var total = BY_ID[pair[0]].semis + BY_ID[pair[1]].semis;
+    var start = settings.low + Math.floor(rng() * (settings.high - total - settings.low + 1));
+    var spelled = spellChain(start, pair, rng);
+    return {
+      intervals: pair,
+      notes: spelled.notes,
+      nums: spelled.nums,
+      midis: spelled.notes.map(midiOf)
+    };
+  }
+
+  // Staff position for guitar notation (treble clef, written an octave above sounding pitch).
+  // 0 = bottom line (written E4), each step = one line or space.
+  function staffPos(n) { return (n.octave + 1) * 7 + n.letter - (4 * 7 + 2); }
+
+  return {
+    INTERVALS: INTERVALS, BY_ID: BY_ID, LETTERS: LETTERS,
+    midiOf: midiOf, noteName: noteName, accSymbol: accSymbol, spellingsOf: spellingsOf, noteCost: noteCost, midiName: midiName,
+    spellUp: spellUp, spellChain: spellChain, fittingPairs: fittingPairs,
+    generateQuestion: generateQuestion, staffPos: staffPos
+  };
+})();
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+
+<!-- ===== App (browser UI) ===== -->
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var SETTINGS_KEY = 'earTrainer3.settings';
+  var HISTORY_KEY = 'earTrainer3.history';
+  var RANGE_MIN = 36, RANGE_MAX = 84;              // C2 … C6 offered in the drop-downs
+  var DEFAULTS = { enabled: Core.INTERVALS.map(function (i) { return i.id; }), low: 40, high: 76, bpm: 60 };
+
+  // ---------- storage helpers (storage can be unavailable in private windows) ----------
+  function load(key) { try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; } }
+  function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch (e) { return false; } }
+
+  var settings = Object.assign({}, DEFAULTS, load(SETTINGS_KEY) || {});
+  var history = load(HISTORY_KEY);
+  if (!history || !Array.isArray(history.sessions)) history = { version: 1, sessions: [] };
+
+  // ---------- session state ----------
+  var session = {
+    id: Date.now().toString(36), start: new Date().toISOString(), end: null,
+    attempted: 0, correct: 0, questions: 0, full: 0, per: {}
+  };
+  var q = null;            // current question
+  var answers = [null, null];
+  var activeSlot = 0;
+  var answered = false;
+  var started = false;
+  var sampler = null;
+
+  // ---------- sound ----------
+  function initPiano() {
+    if (typeof Tone === 'undefined') {
+      setStatus('Could not load the sound library. Check your internet connection and reload the page.');
+      return Promise.reject();
+    }
+    var urls = {};
+    var names = { A: 'A', C: 'C', 'D#': 'Ds', 'F#': 'Fs' };
+    for (var oct = 1; oct <= 7; oct++) {
+      ['C', 'D#', 'F#', 'A'].forEach(function (n) {
+        if (oct === 1 && n !== 'A') return;          // start at A1
+        if (oct === 7 && n !== 'C') return;          // end at C7
+        urls[n + oct] = names[n] + oct + '.mp3';
+      });
+    }
+    return new Promise(function (resolve, reject) {
+      sampler = new Tone.Sampler({
+        urls: urls,
+        baseUrl: 'https://tonejs.github.io/audio/salamander/',
+        release: 1,
+        onload: resolve,
+        onerror: reject
+      }).toDestination();
+    });
+  }
+
+  function play() {
+    if (!sampler || !q) return;
+    sampler.releaseAll();
+    var gap = 60 / settings.bpm;
+    var now = Tone.now() + 0.05;
+    q.midis.forEach(function (m, i) {
+      var note = Tone.Frequency(m, 'midi').toNote();
+      sampler.triggerAttackRelease(note, Math.max(gap * 0.95, 0.5), now + i * gap);
+    });
+  }
+
+  // ---------- staff drawing ----------
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var STEP = 5, BASE_Y = 110, NOTE_X = [140, 220, 300];
+  function yOf(pos) { return BASE_Y - pos * STEP; }
+  function el(tag, attrs, text) {
+    var e = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function drawStaff() {
+    var svg = $('staff');
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var ink = 'var(--staff)';
+    for (var p = 0; p <= 8; p += 2) {
+      svg.appendChild(el('line', { x1: 10, x2: 350, y1: yOf(p), y2: yOf(p), stroke: ink, 'stroke-width': 1 }));
+    }
+    // Treble clef with a small 8 below = guitar (sounds an octave lower than written)
+    // The clef glyph's size differs between fonts, so measure it and fit it from above
+    // the top line down to below the bottom line.
+    var clef = el('text', { x: 0, y: 0, 'font-size': 60, fill: ink, style: 'font-family: "Bravura","Apple Symbols","Segoe UI Symbol","Noto Music",serif' }, '𝄞');
+    svg.appendChild(clef);
+    var bb = clef.getBBox();
+    if (bb.height > 0) {
+      var top = yOf(11.5), bottom = yOf(-4.5), sc = (bottom - top) / bb.height;
+      clef.setAttribute('transform', 'translate(' + (18 - bb.x * sc) + ' ' + (top - bb.y * sc) + ') scale(' + sc + ')');
+      svg.appendChild(el('text', { x: 18 + bb.width * sc / 2, y: bottom + 12, 'text-anchor': 'middle', 'font-size': 12, fill: ink, 'font-weight': 700 }, '8'));
+    }
+    if (!q) return;
+
+    var count = answered ? 3 : 1;
+    for (var i = 0; i < count; i++) drawNote(svg, q.notes[i], NOTE_X[i], ink);
+
+    if (answered) {
+      for (var j = 0; j < 2; j++) {
+        var ok = answers[j] === q.intervals[j];
+        var x = (NOTE_X[j] + NOTE_X[j + 1]) / 2;
+        svg.appendChild(el('text', { x: x, y: 18, 'text-anchor': 'middle', 'font-size': 18, 'font-weight': 700, fill: ok ? 'var(--ok)' : 'var(--bad)' }, ok ? '✓' : '✗'));
+        svg.appendChild(el('text', { x: x, y: 166, 'text-anchor': 'middle', 'font-size': 12, fill: 'var(--muted)' }, Core.BY_ID[q.intervals[j]].label));
+      }
+    }
+  }
+
+  function drawNote(svg, n, x, ink) {
+    var pos = Core.staffPos(n);
+    // ledger lines below / above the staff
+    for (var l = -2; l >= pos; l -= 2) svg.appendChild(el('line', { x1: x - 12, x2: x + 12, y1: yOf(l), y2: yOf(l), stroke: ink, 'stroke-width': 1 }));
+    for (var h = 10; h <= pos; h += 2) svg.appendChild(el('line', { x1: x - 12, x2: x + 12, y1: yOf(h), y2: yOf(h), stroke: ink, 'stroke-width': 1 }));
+    svg.appendChild(el('ellipse', { cx: x, cy: yOf(pos), rx: 7, ry: 5, fill: 'none', stroke: ink, 'stroke-width': 2, transform: 'rotate(-20 ' + x + ' ' + yOf(pos) + ')' }));
+    if (n.acc !== 0) {
+      var sym = Core.accSymbol(n.acc);
+      svg.appendChild(el('text', { x: x - 13, y: yOf(pos) + 6, 'text-anchor': 'end', 'font-size': 18, fill: ink }, sym));
+    }
+  }
+
+  // ---------- answer grid ----------
+  function buildGrid() {
+    var grid = $('answerGrid');
+    var cols = ['', '2', '3', '4', '5', '6', '7', '8'];
+    cols.forEach(function (c) { grid.appendChild(Object.assign(document.createElement('div'), { className: 'colhdr', textContent: c })); });
+    var rows = [
+      ['minor',   [null, 'm2', 'm3', null, null, 'm6', 'm7', null]],
+      ['major',   [null, 'M2', 'M3', null, null, 'M6', 'M7', null]],
+      ['perfect', [null, null, null, 'P4', 'P5', null, null, 'P8']]
+    ];
+    rows.forEach(function (r) {
+      grid.appendChild(Object.assign(document.createElement('div'), { className: 'rowlbl', textContent: r[0] }));
+      r[1].slice(1).forEach(function (id) {
+        grid.appendChild(id ? answerButton(id) : document.createElement('div'));
+      });
+    });
+    grid.appendChild(Object.assign(document.createElement('div'), { className: 'rowlbl', textContent: 'aug/dim' }));
+    var tt = answerButton('TT');
+    tt.classList.add('tritone');
+    grid.appendChild(tt);
+  }
+
+  function answerButton(id) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = Core.BY_ID[id].label;
+    b.title = Core.BY_ID[id].name;
+    b.dataset.id = id;
+    b.addEventListener('click', function () { choose(id); });
+    return b;
+  }
+
+  function refreshGrid() {
+    var buttons = $('answerGrid').querySelectorAll('button');
+    buttons.forEach(function (b) {
+      b.disabled = !q || answered || settings.enabled.indexOf(b.dataset.id) < 0;
+    });
+  }
+
+  function refreshSlots() {
+    [0, 1].forEach(function (i) {
+      var s = $('slot' + i);
+      s.querySelector('.val').textContent = answers[i] ? Core.BY_ID[answers[i]].label : '—';
+      s.classList.toggle('active', !!q && !answered && activeSlot === i);
+      s.classList.toggle('ok', answered && answers[i] === q.intervals[i]);
+      s.classList.toggle('bad', answered && answers[i] !== q.intervals[i]);
+      s.disabled = !q || answered;
+    });
+  }
+
+  // ---------- flow ----------
+  function setStatus(t) { $('status').textContent = t; }
+
+  function nextQuestion() {
+    var next = Core.generateQuestion(settings);
+    if (!next) {
+      setStatus('No interval pair fits the note range — widen the range or pick other intervals in Settings.');
+      return;
+    }
+    q = next;
+    answers = [null, null];
+    activeSlot = 0;
+    answered = false;
+    $('feedback').innerHTML = '';
+    setStatus('Name interval 1 (note 1 → 2).');
+    render();
+    play();
+  }
+
+  function choose(id) {
+    if (!q || answered) return;
+    answers[activeSlot] = id;
+    if (activeSlot === 0) {
+      activeSlot = 1;
+      setStatus('Now name interval 2 (note 2 → 3).');
+      render();
+    } else if (answers[0]) {
+      submit();
+    }
+  }
+
+  function submit() {
+    answered = true;
+    var right = 0;
+    session.questions++;
+    for (var i = 0; i < 2; i++) {
+      var id = q.intervals[i];
+      var ok = answers[i] === id;
+      session.attempted++;
+      if (ok) { session.correct++; right++; }
+      var p = session.per[id] || (session.per[id] = { a: 0, c: 0 });
+      p.a++;
+      if (ok) p.c++;
+    }
+    if (right === 2) session.full++;
+    recordSession();
+
+    var fb = $('feedback');
+    fb.innerHTML = '';
+    for (var j = 0; j < 2; j++) {
+      var ok2 = answers[j] === q.intervals[j];
+      var d = document.createElement('div');
+      d.className = 'line ' + (ok2 ? 'ok' : 'bad');
+      d.textContent = (ok2 ? '✓ Interval ' + (j + 1) + ': ' + Core.BY_ID[answers[j]].label
+        : '✗ Interval ' + (j + 1) + ': you said ' + Core.BY_ID[answers[j]].label + ', correct is ' + Core.BY_ID[q.intervals[j]].label)
+        + ' (' + Core.BY_ID[q.intervals[j]].name + ')';
+      fb.appendChild(d);
+    }
+    var names = q.notes.map(Core.noteName);
+    var notes = document.createElement('div');
+    notes.className = 'notes';
+    notes.innerHTML = names[0] + ' → ' + names[1] + ' = ' + Core.BY_ID[q.intervals[0]].label + '<br>' +
+                      names[1] + ' → ' + names[2] + ' = ' + Core.BY_ID[q.intervals[1]].label;
+    fb.appendChild(notes);
+
+    setStatus(right === 2 ? 'Both right!' : right === 1 ? 'One out of two.' : 'Not this time — replay and listen again.');
+    render();
+  }
+
+  function render() {
+    drawStaff();
+    refreshGrid();
+    refreshSlots();
+    $('btnReplay').disabled = !q;
+    $('btnNext').textContent = started ? 'Next ▸' : '▶ Start';
+    renderScore();
+  }
+
+  function renderScore() {
+    var pct = session.attempted ? Math.round(100 * session.correct / session.attempted) + '%' : '–';
+    $('score').innerHTML = 'This session — Intervals: <b>' + session.correct + ' / ' + session.attempted + '</b> (' + pct + ')' +
+      ' · Fully correct questions: <b>' + session.full + ' / ' + session.questions + '</b>';
+  }
+
+  function onNext() {
+    if (started) { nextQuestion(); return; }
+    var btn = $('btnNext');
+    btn.disabled = true;
+    setStatus('Loading piano…');
+    var ctx = (typeof Tone !== 'undefined') ? Tone.start() : Promise.resolve();
+    ctx.then(initPiano).then(function () {
+      started = true;
+      btn.disabled = false;
+      nextQuestion();
+    }).catch(function () {
+      btn.disabled = false;
+      setStatus('Could not load the piano sounds. Check your internet connection and press Start again.');
+    });
+  }
+
+  // ---------- history ----------
+  function recordSession() {
+    session.end = new Date().toISOString();
+    var i = history.sessions.findIndex(function (s) { return s.id === session.id; });
+    var copy = JSON.parse(JSON.stringify(session));
+    if (i >= 0) history.sessions[i] = copy; else history.sessions.push(copy);
+    $('storageWarn').classList.toggle('hidden', save(HISTORY_KEY, history));
+    if (!$('progress').classList.contains('hidden')) renderProgress();
+  }
+
+  function fmtDate(iso) {
+    var d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
+           d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function renderProgress() {
+    var body = $('progressBody');
+    var sessions = history.sessions.filter(function (s) { return s.attempted > 0; })
+      .sort(function (a, b) { return a.start < b.start ? -1 : 1; });
+    if (!sessions.length) {
+      body.innerHTML = '<p style="color:var(--muted)">No history yet. Answer a few questions and your progress will appear here.</p>';
+      return;
+    }
+    var html = '<h3 style="margin-top:0">Accuracy per session</h3>' + chartSvg(sessions);
+
+    // per-interval totals, weakest first
+    var tot = {};
+    sessions.forEach(function (s) {
+      for (var id in s.per) {
+        var t = tot[id] || (tot[id] = { a: 0, c: 0 });
+        t.a += s.per[id].a; t.c += s.per[id].c;
+      }
+    });
+    var ids = Object.keys(tot).sort(function (a, b) { return tot[a].c / tot[a].a - tot[b].c / tot[b].a; });
+    html += '<h3>Accuracy per interval (all sessions, weakest first)</h3><table><tr><th>Interval</th><th class="num">Right</th><th class="num">%</th><th style="width:40%"></th></tr>';
+    ids.forEach(function (id) {
+      var p = Math.round(100 * tot[id].c / tot[id].a);
+      html += '<tr><td>' + Core.BY_ID[id].label + '</td><td class="num">' + tot[id].c + ' / ' + tot[id].a + '</td><td class="num">' + p +
+              '%</td><td><div class="bar"><span style="width:' + p + '%"></span></div></td></tr>';
+    });
+    html += '</table>';
+
+    html += '<h3>Sessions</h3><div class="tablewrap"><table><tr><th>Date</th><th class="num">Intervals</th><th class="num">%</th><th class="num">Full Qs</th></tr>';
+    sessions.slice().reverse().forEach(function (s) {
+      html += '<tr><td>' + fmtDate(s.start) + (s.id === session.id ? ' (now)' : '') + '</td><td class="num">' + s.correct + ' / ' + s.attempted +
+              '</td><td class="num">' + Math.round(100 * s.correct / s.attempted) + '%</td><td class="num">' + s.full + ' / ' + s.questions + '</td></tr>';
+    });
+    html += '</table></div>';
+    body.innerHTML = html;
+  }
+
+  function chartSvg(sessions) {
+    var W = 600, H = 200, L = 40, R = 12, T = 12, B = 26;
+    var n = sessions.length;
+    var xOf = function (i) { return n === 1 ? (L + W - R) / 2 : L + i * (W - L - R) / (n - 1); };
+    var yOfP = function (p) { return T + (100 - p) * (H - T - B) / 100; };
+    var s = '<svg id="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Accuracy per session chart">';
+    [0, 25, 50, 75, 100].forEach(function (p) {
+      s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yOfP(p) + '" y2="' + yOfP(p) + '" stroke="var(--line)" stroke-width="1"/>';
+      s += '<text x="' + (L - 6) + '" y="' + (yOfP(p) + 4) + '" text-anchor="end" font-size="11" fill="var(--muted)">' + p + '%</text>';
+    });
+    var pts = sessions.map(function (x, i) { return xOf(i) + ',' + yOfP(100 * x.correct / x.attempted); });
+    if (n > 1) s += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>';
+    sessions.forEach(function (x, i) {
+      var p = Math.round(100 * x.correct / x.attempted);
+      s += '<circle cx="' + xOf(i) + '" cy="' + yOfP(p) + '" r="4.5" fill="var(--accent)"><title>' + fmtDate(x.start) + ': ' + p + '% (' + x.correct + '/' + x.attempted + ')</title></circle>';
+    });
+    s += '<text x="' + L + '" y="' + (H - 6) + '" font-size="11" fill="var(--muted)">' + fmtDate(sessions[0].start).split(' ').slice(0, 3).join(' ') + '</text>';
+    if (n > 1) s += '<text x="' + (W - R) + '" y="' + (H - 6) + '" text-anchor="end" font-size="11" fill="var(--muted)">' + fmtDate(sessions[n - 1].start).split(' ').slice(0, 3).join(' ') + '</text>';
+    return s + '</svg>';
+  }
+
+  function exportHistory() {
+    var blob = new Blob([JSON.stringify(history, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'ear-trainer-history-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+
+  function importHistory(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var data = JSON.parse(reader.result);
+        if (!data || !Array.isArray(data.sessions)) throw new Error('bad file');
+        // Merge: add sessions we don't already have (matched by id).
+        var have = {};
+        history.sessions.forEach(function (s) { have[s.id] = true; });
+        var added = 0;
+        data.sessions.forEach(function (s) {
+          if (s && s.id && !have[s.id] && typeof s.attempted === 'number') { history.sessions.push(s); added++; }
+        });
+        save(HISTORY_KEY, history);
+        renderProgress();
+        alert('Loaded ' + added + ' session(s) from the backup.');
+      } catch (e) {
+        alert('That file does not look like an Ear Trainer history backup.');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ---------- settings panel ----------
+  function buildSettings() {
+    var box = $('intervalChecks');
+    Core.INTERVALS.forEach(function (iv) {
+      var lab = document.createElement('label');
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = iv.id;
+      cb.checked = settings.enabled.indexOf(iv.id) >= 0;
+      cb.addEventListener('change', onIntervalsChanged);
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode(iv.label));
+      box.appendChild(lab);
+    });
+    $('checkAll').addEventListener('click', function () { setAllChecks(true); });
+    $('checkNone').addEventListener('click', function () { setAllChecks(false); });
+
+    ['lowNote', 'highNote'].forEach(function (sid) {
+      var sel = $(sid);
+      for (var m = RANGE_MIN; m <= RANGE_MAX; m++) {
+        var o = document.createElement('option');
+        o.value = m;
+        o.textContent = Core.midiName(m);
+        sel.appendChild(o);
+      }
+      sel.addEventListener('change', onRangeChanged);
+    });
+    $('lowNote').value = settings.low;
+    $('highNote').value = settings.high;
+
+    $('bpm').value = settings.bpm;
+    $('bpm').addEventListener('input', function () {
+      settings.bpm = +this.value;
+      saveSettings();
+    });
+    showBpm();
+    validateSettings();
+  }
+
+  function setAllChecks(on) {
+    $('intervalChecks').querySelectorAll('input').forEach(function (cb) { cb.checked = on; });
+    onIntervalsChanged();
+  }
+
+  function onIntervalsChanged() {
+    var picked = [];
+    $('intervalChecks').querySelectorAll('input').forEach(function (cb) { if (cb.checked) picked.push(cb.value); });
+    if (picked.length) settings.enabled = picked;
+    saveSettings();
+  }
+
+  function onRangeChanged() {
+    var lo = +$('lowNote').value, hi = +$('highNote').value;
+    if (lo < hi) { settings.low = lo; settings.high = hi; }
+    saveSettings();
+  }
+
+  function showBpm() {
+    $('bpmLabel').textContent = settings.bpm + ' BPM (' + (60 / settings.bpm).toFixed(2) + ' s between notes)';
+  }
+
+  function validateSettings() {
+    var warn = '';
+    var picked = $('intervalChecks').querySelectorAll('input:checked').length;
+    if (!picked) warn = 'Pick at least one interval (still using your previous choice).';
+    else if (+$('lowNote').value >= +$('highNote').value) warn = 'The lowest note must be below the highest note.';
+    else if (!Core.fittingPairs(settings.enabled, settings.low, settings.high).length) warn = 'The range is too narrow for these intervals — widen it.';
+    $('settingsWarn').textContent = warn;
+  }
+
+  function saveSettings() {
+    showBpm();
+    validateSettings();
+    save(SETTINGS_KEY, settings);
+    if (!answered) refreshGrid();
+  }
+
+  // ---------- panels, buttons, keyboard ----------
+  function togglePanel(panelId, btnId, onOpen) {
+    var p = $(panelId);
+    var open = p.classList.toggle('hidden') === false;
+    $(btnId).setAttribute('aria-expanded', open);
+    if (open && onOpen) onOpen();
+  }
+
+  $('btnSettings').addEventListener('click', function () { togglePanel('settings', 'btnSettings'); });
+  $('btnProgress').addEventListener('click', function () { togglePanel('progress', 'btnProgress', renderProgress); });
+  $('btnNext').addEventListener('click', onNext);
+  $('btnReplay').addEventListener('click', play);
+  $('slot0').addEventListener('click', function () {
+    if (q && !answered) { activeSlot = 0; setStatus('Change interval 1 (note 1 → 2).'); refreshSlots(); }
+  });
+  $('slot1').addEventListener('click', function () {
+    if (q && !answered && answers[0]) { activeSlot = 1; setStatus('Now name interval 2 (note 2 → 3).'); refreshSlots(); }
+  });
+  $('btnExport').addEventListener('click', exportHistory);
+  $('btnImport').addEventListener('click', function () { $('importFile').click(); });
+  $('importFile').addEventListener('change', function () { if (this.files[0]) importHistory(this.files[0]); this.value = ''; });
+  $('btnClear').addEventListener('click', function () {
+    if (confirm('Delete all saved history on this browser? This cannot be undone (unless you downloaded a backup).')) {
+      history = { version: 1, sessions: [] };
+      session.attempted = session.correct = session.questions = session.full = 0;
+      session.per = {};
+      save(HISTORY_KEY, history);
+      renderProgress();
+      renderScore();
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'select' || tag === 'textarea') return;
+    var k = e.key.toLowerCase();
+    if (k === 'r' || k === ' ') { e.preventDefault(); if (q) play(); }
+    else if (k === 'n' || k === 'enter') { e.preventDefault(); if (!$('btnNext').disabled) onNext(); }
+  });
+
+  buildGrid();
+  buildSettings();
+  render();
+})();
+</script>
+</body>
+</html>
