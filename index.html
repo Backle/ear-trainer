@@ -106,6 +106,10 @@
   select { padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
   input[type=range] { flex: 1; min-width: 140px; }
   .warn { color: var(--bad); font-size: 0.9rem; }
+  input[type=number] { font: inherit; width: 4.2em; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+  .lenopt { display: flex; align-items: center; gap: 6px; }
+  #sessionInfo { color: var(--accent); font-weight: 600; font-size: 0.95rem; }
+  #feedback .summary { margin-top: 10px; padding: 10px; border-radius: 8px; border: 2px solid var(--accent); }
 
   table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
   th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
@@ -133,6 +137,7 @@
       <button id="btnSettings" class="small" aria-expanded="false">⚙ Settings</button>
     </div>
     <div class="score" id="score"></div>
+    <div id="sessionInfo"></div>
     <div class="warn hidden" id="storageWarn">This browser is not letting the page save your history, so scores will only last until you close the page.</div>
   </header>
 
@@ -149,6 +154,11 @@
     <div class="row">
       <label>Lowest <select id="lowNote"></select></label>
       <label>Highest <select id="highNote"></select></label>
+    </div>
+    <h3>Session length</h3>
+    <div class="row">
+      <label class="lenopt"><input type="radio" name="lenMode" value="questions"> <input type="number" id="lenQuestions" min="1" max="500" aria-label="Number of questions"> questions</label>
+      <label class="lenopt"><input type="radio" name="lenMode" value="minutes"> <input type="number" id="lenMinutes" min="1" max="120" aria-label="Number of minutes"> minutes</label>
     </div>
     <h3>Tempo</h3>
     <div class="row">
@@ -335,7 +345,8 @@ var Core = (function () {
   var SETTINGS_KEY = 'earTrainer3.settings';
   var HISTORY_KEY = 'earTrainer3.history';
   var RANGE_MIN = 36, RANGE_MAX = 84;              // C2 … C6 offered in the drop-downs
-  var DEFAULTS = { enabled: Core.INTERVALS.map(function (i) { return i.id; }), low: 40, high: 76, bpm: 60 };
+  var DEFAULTS = { enabled: Core.INTERVALS.map(function (i) { return i.id; }), low: 40, high: 76, bpm: 60,
+                   lengthMode: 'questions', lengthQuestions: 10, lengthMinutes: 5 };
 
   // ---------- storage helpers (storage can be unavailable in private windows) ----------
   function load(key) { try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; } }
@@ -346,10 +357,16 @@ var Core = (function () {
   if (!history || !Array.isArray(history.sessions)) history = { version: 1, sessions: [] };
 
   // ---------- session state ----------
-  var session = {
-    id: Date.now().toString(36), start: new Date().toISOString(), end: null,
-    attempted: 0, correct: 0, questions: 0, full: 0, per: {}
-  };
+  function newSession() {
+    return {
+      id: Date.now().toString(36), start: new Date().toISOString(), end: null,
+      attempted: 0, correct: 0, questions: 0, full: 0, per: {}
+    };
+  }
+  var session = newSession();
+  var sessionStartMs = null;   // set when the first question of a session plays
+  var sessionOver = false;
+  var timeUp = false;
   var q = null;            // current question
   var answers = [null, null];
   var activeSlot = 0;
@@ -504,6 +521,8 @@ var Core = (function () {
   function setStatus(t) { $('status').textContent = t; }
 
   function nextQuestion() {
+    if (sessionOver) { startNewSession(); return; }
+    if (timeUp) { endSession(); return; }
     var next = Core.generateQuestion(settings);
     if (!next) {
       setStatus('No interval pair fits the note range — widen the range or pick other intervals in Settings.');
@@ -514,9 +533,68 @@ var Core = (function () {
     activeSlot = 0;
     answered = false;
     $('feedback').innerHTML = '';
+    if (sessionStartMs === null) sessionStartMs = Date.now();
     setStatus('Name interval 1 (note 1 → 2).');
     render();
     play();
+  }
+
+  // ---------- session length ----------
+  function secondsLeft() {
+    if (sessionStartMs === null) return settings.lengthMinutes * 60;
+    return Math.max(0, Math.ceil(settings.lengthMinutes * 60 - (Date.now() - sessionStartMs) / 1000));
+  }
+
+  function sessionLimitReached() {
+    return settings.lengthMode === 'questions' ? session.questions >= settings.lengthQuestions : timeUp;
+  }
+
+  function renderSessionInfo() {
+    var t;
+    if (sessionOver) t = 'Session complete';
+    else if (settings.lengthMode === 'questions') {
+      t = 'Question ' + Math.min(session.questions + (q && !answered ? 1 : 0), settings.lengthQuestions) + ' of ' + settings.lengthQuestions;
+      if (!q) t = settings.lengthQuestions + ' questions this session';
+    } else {
+      var left = secondsLeft();
+      t = timeUp ? "Time's up — finish this question"
+        : Math.floor(left / 60) + ':' + ('0' + left % 60).slice(-2) + ' left' + (q ? ' · question ' + (session.questions + (answered ? 0 : 1)) : '');
+    }
+    $('sessionInfo').textContent = t;
+  }
+
+  // Ticks every second for the minutes mode.
+  setInterval(function () {
+    if (settings.lengthMode !== 'minutes' || sessionStartMs === null || sessionOver) return;
+    if (!timeUp && secondsLeft() === 0) {
+      timeUp = true;
+      if (!q || answered) endSession();
+      else setStatus("Time's up — answer this last question to finish.");
+    }
+    renderSessionInfo();
+  }, 1000);
+
+  function endSession() {
+    sessionOver = true;
+    if (sampler) sampler.releaseAll();
+    var pct = session.attempted ? Math.round(100 * session.correct / session.attempted) : 0;
+    var box = document.createElement('div');
+    box.className = 'summary';
+    box.innerHTML = '<b>Session complete!</b><br>Intervals: <b>' + session.correct + ' / ' + session.attempted + '</b> (' + pct + '%)' +
+      '<br>Fully correct questions: <b>' + session.full + ' / ' + session.questions + '</b>' +
+      '<br><span style="color:var(--muted)">Saved to your history — see 📈 Progress. Press New session to go again.</span>';
+    $('feedback').appendChild(box);
+    setStatus('Session complete.');
+    render();
+  }
+
+  function startNewSession() {
+    session = newSession();
+    sessionStartMs = null;
+    sessionOver = false;
+    timeUp = false;
+    q = null;
+    nextQuestion();
   }
 
   function choose(id) {
@@ -567,6 +645,7 @@ var Core = (function () {
 
     setStatus(right === 2 ? 'Both right!' : right === 1 ? 'One out of two.' : 'Not this time — replay and listen again.');
     render();
+    if (sessionLimitReached()) endSession();
   }
 
   function render() {
@@ -574,8 +653,9 @@ var Core = (function () {
     refreshGrid();
     refreshSlots();
     $('btnReplay').disabled = !q;
-    $('btnNext').textContent = started ? 'Next ▸' : '▶ Start';
+    $('btnNext').textContent = !started ? '▶ Start' : sessionOver ? 'New session ▸' : 'Next ▸';
     renderScore();
+    renderSessionInfo();
   }
 
   function renderScore() {
@@ -736,6 +816,18 @@ var Core = (function () {
     $('lowNote').value = settings.low;
     $('highNote').value = settings.high;
 
+    document.querySelectorAll('input[name=lenMode]').forEach(function (r) {
+      r.checked = r.value === settings.lengthMode;
+      r.addEventListener('change', function () { settings.lengthMode = this.value; onLengthChanged(); });
+    });
+    $('lenQuestions').value = settings.lengthQuestions;
+    $('lenMinutes').value = settings.lengthMinutes;
+    $('lenQuestions').addEventListener('change', function () { settings.lengthQuestions = clampInt(this.value, 1, 500, 10); this.value = settings.lengthQuestions; onLengthChanged(); });
+    $('lenMinutes').addEventListener('change', function () { settings.lengthMinutes = clampInt(this.value, 1, 120, 5); this.value = settings.lengthMinutes; onLengthChanged(); });
+    // Typing in a number box also selects that option.
+    $('lenQuestions').addEventListener('focus', function () { selectMode('questions'); });
+    $('lenMinutes').addEventListener('focus', function () { selectMode('minutes'); });
+
     $('bpm').value = settings.bpm;
     $('bpm').addEventListener('input', function () {
       settings.bpm = +this.value;
@@ -743,6 +835,24 @@ var Core = (function () {
     });
     showBpm();
     validateSettings();
+  }
+
+  function clampInt(v, lo, hi, dflt) {
+    var n = Math.round(+v);
+    return isFinite(n) && n > 0 ? Math.min(hi, Math.max(lo, n)) : dflt;
+  }
+
+  function selectMode(mode) {
+    document.querySelector('input[name=lenMode][value=' + mode + ']').checked = true;
+    if (settings.lengthMode !== mode) { settings.lengthMode = mode; onLengthChanged(); }
+  }
+
+  // A shorter limit set mid-session takes effect after the current question.
+  function onLengthChanged() {
+    timeUp = settings.lengthMode === 'minutes' && sessionStartMs !== null && secondsLeft() === 0;
+    saveSettings();
+    if (!sessionOver && (!q || answered) && sessionStartMs !== null && sessionLimitReached()) endSession();
+    renderSessionInfo();
   }
 
   function setAllChecks(on) {
@@ -810,6 +920,7 @@ var Core = (function () {
       session.attempted = session.correct = session.questions = session.full = 0;
       session.per = {};
       save(HISTORY_KEY, history);
+      renderSessionInfo();
       renderProgress();
       renderScore();
     }
